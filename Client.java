@@ -6,6 +6,7 @@ import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import com.google.gson.Gson;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +15,7 @@ public class Client {
 	private String userId;
 	private boolean hostFlag;
 	private boolean roomFlag;
-	private String roomID;
+	private int roomID;
 	private String gameTopic;
 	private boolean liar;
 	private MqttClient mqttClient;
@@ -71,37 +72,92 @@ public class Client {
 
 				// 게임 설정 처리
 				private void handleGameSetting(GamePayload.GameSettingPayload payload) {
-					gameTopic = payload.getKeyword();
-					liar = payload.getLiar().equals(userId);
-					if (liar)
-						//내가 라이어임을 출력
-						// 게임 설정을 받았으므로 준비 완료 메시지를 발행
-						publish("game", new Gson().toJson(new GamePayload.GameType(new G_Base(1, "gamesetting", userId, "All", ""))));
+					if (payload.getBase().getId() == roomID) {
+						gameTopic = payload.getKeyword();
+						liar = payload.getLiar().equals(userId);
+						if (liar) {
+							//내가 라이어임을 출력
+						} else {
+							// gameTopic 출력
+						}
+						if (확인버튼 클릭 시){
+							G_Base base = new G_Base(roomID, "gamesetting", userId, "host", LocalDateTime.now().toString());
+							publish("game", new Gson().toJson(new GamePayload.GameSettingPayload(base, true)));
+						}
+					}
 				}
 
 				// 게임 시작 처리
 				private void handleGameStart(GamePayload.GameStartPayload payload) {
-					// 게임이 시작됐으므로 게임에 관련된 UI를 업데이트
+					if (payload.getBase().getId() == roomID) {
+						// 게임창 GUI로 띄움
+					}
 				}
 
 				// 첫 번째 의견 처리
 				private void handleFirstOpinion(GamePayload.FirstOpinionPayload payload) {
-					// 첫 번째 의견을 받았으므로 UI 업데이트
+					if (payload.getBase().getId() == roomID) {
+						if (payload.getBase().getReceiver().equals(userId)) {
+							// 내 채팅창 활성화 & 키워드 설명 시작
+							G_Base base = new G_Base(roomID, "firstopinion", userId, "all", LocalDateTime.now().toString());
+							String message = null;
+							publish("game", new Gson().toJson(new GamePayload.FirstOpinionPayload(base, message)));
+						} else {
+							String message = payload.getMessage();
+							// 메세지 화면에 출력
+						}
+					}
 				}
 
 				// 채팅 처리
 				private void handleChat(GamePayload.ChatPayload payload) {
-					// 채팅 메시지를 받았으므로 UI 업데이트
+					if (payload.getBase().getId() == roomID) {
+						long startTime = System.currentTimeMillis();
+						long duration = 180 * 1000;
+						while (System.currentTimeMillis() - startTime < duration) {
+							// 멀티스레드로 작성
+
+							// 받은 메세지 출력
+							if (!(payload.getBase().getSender().equals(userId)) && payload.getBase().getReceiver() == "all") {
+								String message = payload.getChat();
+							}
+
+							// 내 채팅창 활성화 & 키워드 설명 시작
+							G_Base base = new G_Base(roomID, "chat", userId, "all", LocalDateTime.now().toString());
+							String message = null;
+							publish("game", new Gson().toJson(new GamePayload.ChatPayload(base, message)));
+
+						}
+					}
 				}
 
 				// 투표 처리
 				private void handleVote(GamePayload.VotePayload payload) {
-					// 투표 결과를 받았으므로 UI 업데이트
+					if (payload.getBase().getId() == roomID) {
+						if (payload.getBase().getReceiver().equals(userId)) {
+							// 전체 유저 출력
+							List<String> userList = payload.getUserList();
+
+							G_Base base = new G_Base(roomID, "vote", userId, "all", LocalDateTime.now().toString());
+							String votee = null;
+							publish("game", new Gson().toJson(new GamePayload.VotePayload(base, votee)));
+						}
+					}
 				}
 
 				// 결과 처리
 				private void handleResult(GamePayload.ResultPayload payload) {
-					// 결과를 받았으므로 UI 업데이트
+					if (payload.getBase().getId() == roomID) {
+						boolean isCorrect = payload.getVotedLiar().equals(payload.getLiar());
+						if ((isCorrect && liar) || (!isCorrect && !liar)) {
+							// 패배 출력
+						} else if ((isCorrect && !liar) || (!isCorrect && liar)) {
+							// 승리 출력
+						}
+						if (확인버튼 클릭 시) {
+							unsubscribe("game");
+						}
+					}
 				}
 
 				@Override
@@ -146,6 +202,16 @@ public class Client {
 			e.printStackTrace();
 		}
 	}
+
+	// 특정 토픽의 구독을 취소하는 메소드
+	public void unsubscribe(String topic) {
+		try {
+			mqttClient.unsubscribe(topic);
+		} catch (MqttException e) {
+			e.printStackTrace();
+		}
+	}
+
 
 	public void disconnect() throws MqttException {
 		if (mqttClient != null) {

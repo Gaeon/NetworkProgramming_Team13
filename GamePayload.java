@@ -1,4 +1,6 @@
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 public class GamePayload {
 
@@ -39,10 +41,16 @@ public class GamePayload {
 		private String keyword;
 		private boolean status;
 
-		public GameSettingPayload(G_Base base, String liar, String keyword, boolean status) {
+		// Host
+		public GameSettingPayload(G_Base base, String liar, String keyword) {
 			this.base = base;
 			this.liar = liar;
 			this.keyword = keyword;
+		}
+
+		// Client
+		public GameSettingPayload(G_Base base, boolean status) {
+			this.base = base;
 			this.status = status;
 		}
 
@@ -79,11 +87,17 @@ public class GamePayload {
 		}
 	}
 
-	// Payload for G_Explain event
 	public static class FirstOpinionPayload implements Serializable {
 		private G_Base base;
 		private String message;
 
+
+		// Host
+		public FirstOpinionPayload(G_Base base) {
+			this.base = base;
+		}
+
+		// Client
 		public FirstOpinionPayload(G_Base base, String message) {
 			this.base = base;
 			this.message = message;
@@ -106,11 +120,16 @@ public class GamePayload {
 		}
 	}
 
-	// Payload for G_Discuss event
 	public static class ChatPayload implements Serializable {
 		private G_Base base;
 		private String chat;
 
+		// Host
+		public ChatPayload(G_Base base) {
+			this.base = base;
+		}
+
+		// Client
 		public ChatPayload(G_Base base, String chat) {
 			this.base = base;
 			this.chat = chat;
@@ -133,13 +152,19 @@ public class GamePayload {
 		}
 	}
 
-	// Payload for G_Vote event
 	public static class VotePayload implements Serializable {
 		private G_Base base;
-		// Add any G_Vote-specific fields here
+		private List<String> userList;
+		private String votee;
 
-		public VotePayload(G_Base base) {
+		public VotePayload(G_Base base, List<String> userList) {
 			this.base = base;
+			this.userList = userList;
+		}
+
+		public VotePayload(G_Base base, String votee) {
+			this.base = base;
+			this.votee = votee;
 		}
 
 		public G_Base getBase() {
@@ -149,20 +174,25 @@ public class GamePayload {
 		public void setBase(G_Base base) {
 			this.base = base;
 		}
+
+		public List<String> getUserList() {
+			return userList;
+		}
+
+		public void setUserList(List<String> userList) {
+			this.userList = userList;
+		}
 	}
 
-	// Payload for G_Result event
 	public static class ResultPayload implements Serializable {
 		private G_Base base;
 		private String votedLiar;
 		private String liar;
-		private boolean winner;
 
-		public ResultPayload(G_Base base, String votedLiar, String liar, boolean winner) {
+		public ResultPayload(G_Base base, String votedLiar, String liar) {
 			this.base = base;
 			this.votedLiar = votedLiar;
 			this.liar = liar;
-			this.winner = winner;
 		}
 
 		public G_Base getBase() {
@@ -187,14 +217,6 @@ public class GamePayload {
 
 		public void setLiar(String liar) {
 			this.liar = liar;
-		}
-
-		public boolean isWinner() {
-			return winner;
-		}
-
-		public void setWinner(boolean winner) {
-			this.winner = winner;
 		}
 	}
 }
