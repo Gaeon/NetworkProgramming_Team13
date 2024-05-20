@@ -6,16 +6,11 @@ public class Data {
             String sender,
             String receiver,
             long time,
-            int roomId
+            String roomId
     ) {}
 
     public record C_refresh(
             C_Base base
-    ) {}
-
-    public record C_refreshconfirm(
-            C_Base base,
-            String topic
     ) {}
 
     public record C_gameroommake(
@@ -43,4 +38,8 @@ public class Data {
     public record C_gameroomstart(
             C_Base base
     ) {}
+    public record RoomInfo(
+
+    ){
+    }
 }
