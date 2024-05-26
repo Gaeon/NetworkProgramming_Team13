@@ -31,7 +31,7 @@ public class LiarGameMain {
     public LiarGameMain() {
         createAndShowLoginGUI();
     }
-
+    //아
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
