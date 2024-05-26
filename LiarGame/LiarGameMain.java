@@ -1,26 +1,32 @@
 package LiarGame;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import org.eclipse.paho.client.mqttv3.*;
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class LiarGameMain {
-    // MQTT client declaration
     private MqttClient client;
-    final String topic1 = "control";
-    final String topic2 = "game";
-    String broker = "tcp://localhost:1883";
-    String client_id;
-    int host_flag = 0;
-    private List<JPanel> roomPanels = new ArrayList<>(); // List to manage room panels
-    private JPanel roomsPanel; // Panel to hold all the room panels
+    private final String topic1 = "control";
+    private final String topic2 = "game";
+    private String broker = "tcp://localhost:1883";
+    private String client_id;
+    private int host_flag = 0;
+    private List<JPanel> roomPanels = new ArrayList<>();
+    private JPanel roomsPanel;
     private JFrame gameFrame;
+    private MqttHandler mqttHandler = new MqttHandler();
+    private static final Logger LOGGER = Logger.getLogger(LiarGameMain.class.getName());
 
     public LiarGameMain() {
         createAndShowLoginGUI();
@@ -55,18 +61,14 @@ public class LiarGameMain {
         submitButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                client_id = idField.getText();
+                client_id = idField.getText() + "_" + System.currentTimeMillis();
                 if (!client_id.isEmpty()) {
                     try {
-                        // Initialize and connect the MQTT client
-                        client = new MqttClient(broker, client_id);
-
-                        // Set the callback for the client
+                        client = new MqttClient(broker, client_id,new MemoryPersistence());
                         client.setCallback(new MqttCallback() {
                             @Override
                             public void connectionLost(Throwable cause) {
-                                System.out.println("Connection lost: " + cause.getMessage());
-                                reconnect();
+                                //LOGGER.log(Level.SEVERE, "Connection lost: " + cause.getMessage());
                             }
 
                             @Override
@@ -82,20 +84,13 @@ public class LiarGameMain {
 
                         client.connect();
 
-                        // Subscribe to topic1
                         client.subscribe(topic1);
 
-                        // Show success dialog
                         JOptionPane.showMessageDialog(frame, "Connected to broker successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
-
-                        // Create and show the new window
                         createAndShowGameGUI();
-
-                        // Close the login frame
                         frame.dispose();
-
                     } catch (MqttException ex) {
-                        ex.printStackTrace();
+                        LOGGER.log(Level.SEVERE, "Failed to connect to broker", ex);
                         JOptionPane.showMessageDialog(frame, "Failed to connect to broker", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 } else {
@@ -116,7 +111,6 @@ public class LiarGameMain {
         JPanel topPanel = new JPanel();
         topPanel.setLayout(new GridLayout(1, 3));
 
-        // 종료하기 버튼 추가
         JButton exitButton = new JButton("종료하기");
         topPanel.add(exitButton);
 
@@ -128,7 +122,6 @@ public class LiarGameMain {
             }
         });
 
-        // 방만들기 버튼 추가
         JButton createRoomButton = new JButton("방만들기");
         topPanel.add(createRoomButton);
 
@@ -142,7 +135,6 @@ public class LiarGameMain {
             }
         });
 
-        // 새로고침 버튼 추가
         JButton refreshButton = new JButton("새로고침");
         topPanel.add(refreshButton);
 
@@ -160,7 +152,7 @@ public class LiarGameMain {
         gameFrame.add(topPanel, BorderLayout.NORTH);
 
         roomsPanel = new JPanel();
-        roomsPanel.setLayout(new GridLayout(0, 1)); // Dynamic rows, 1 column
+        roomsPanel.setLayout(new GridLayout(0, 1));
         gameFrame.add(new JScrollPane(roomsPanel), BorderLayout.CENTER);
 
         gameFrame.setVisible(true);
@@ -168,32 +160,48 @@ public class LiarGameMain {
 
     private void handleIncomingMessage(String message) {
         Gson gson = new Gson();
-        Data.C_Base base = gson.fromJson(message, Data.C_Base.class);
+        JsonObject base = gson.fromJson(message, JsonObject.class);
 
-        switch (base.type()) {
+        // "type" 필드에서 메시지 타입을 가져옴
+        int messageType = base.get("type").getAsInt();
+
+        // 메시지 타입에 따라 처리
+        switch (messageType) {
             case Constant.C_GAMEROOMMAKE:
-                createRoomPanel(base.sender(), base.roomId());
+                // "sender"와 "roomId" 필드에서 값을 추출하여 메서드에 전달
+                createRoomPanel(base.get("sender").getAsString(), base.get("roomId").getAsString());
                 break;
             case Constant.C_GAMEROOMENTER:
-                // Handle game room enter logic
+                // 다른 처리
                 break;
-            // handle other message types as needed
         }
     }
 
+
+
     private void createRoomPanel(String sender, String roomId) {
+        // Create a panel for the room
         JPanel roomPanel = new JPanel();
         roomPanel.setLayout(new BorderLayout());
 
-        JLabel roomLabel = new JLabel("Room ID: " + roomId + ", Host: " + sender);
+        // Create a titled border for the room panel
+        TitledBorder titledBorder = BorderFactory.createTitledBorder("방 번호" + roomId);
+        roomPanel.setBorder(titledBorder);
+
+        // Label to display the host of the room
+        JLabel roomLabel = new JLabel("Host 이름 :" + sender);
         roomPanel.add(roomLabel, BorderLayout.CENTER);
 
+        // Button to join the room
         JButton joinButton = new JButton("참가하기");
-        roomPanel.add(joinButton, BorderLayout.EAST);
+        roomPanel.add(joinButton, BorderLayout.SOUTH);
 
+        // ActionListener for the join button
         joinButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                // Perform action when join button is clicked
+                // For example, sending a request to join the room
                 Data.C_Base base = new Data.C_Base(Constant.C_GAMEROOMENTER, client_id, "server", System.currentTimeMillis(), roomId);
                 Data.C_gameroomenter gameroomenter = new Data.C_gameroomenter(base);
                 Gson gson = new Gson();
@@ -202,35 +210,44 @@ public class LiarGameMain {
             }
         });
 
-        roomPanels.add(roomPanel);
+        // Add the room panel to the roomsPanel
         roomsPanel.add(roomPanel);
+        // Revalidate and repaint the roomsPanel to reflect the changes
         roomsPanel.revalidate();
         roomsPanel.repaint();
     }
 
+
+
     private void reconnect() {
-        try {
-            while (!client.isConnected()) {
-                System.out.println("Reconnecting...");
+        while (!client.isConnected()) {
+            LOGGER.log(Level.INFO, "Reconnecting...");
+            try {
                 client.reconnect();
-                Thread.sleep(2000); // Wait for 2 seconds before retrying
+                LOGGER.log(Level.INFO, "Reconnected successfully.");
+            } catch (MqttException e) {
+                LOGGER.log(Level.SEVERE, "Reconnect failed. Retrying...", e);
+                return;
             }
-        } catch (MqttException | InterruptedException e) {
-            e.printStackTrace();
         }
     }
 
     public boolean send(String topic, String msg) {
         try {
             if (!client.isConnected()) {
-                System.out.println("Client is not connected. Cannot send message.");
+                LOGGER.log(Level.INFO, "Client is not connected. Reconnecting...");
                 reconnect();
             }
-            MqttMessage message = new MqttMessage();
-            message.setPayload(msg.getBytes());
-            client.publish(topic, message);
+            if (client.isConnected()) {
+                MqttMessage message = new MqttMessage();
+                message.setPayload(msg.getBytes());
+                client.publish(topic, message);
+            } else {
+                LOGGER.log(Level.SEVERE, "Failed to reconnect.");
+                return false;
+            }
         } catch (MqttException e) {
-            e.printStackTrace();
+            LOGGER.log(Level.SEVERE, "Failed to publish message", e);
             return false;
         }
         return true;
@@ -242,7 +259,7 @@ public class LiarGameMain {
                 client.disconnect();
                 client.close();
             } catch (MqttException e) {
-                e.printStackTrace();
+                LOGGER.log(Level.SEVERE, "Failed to close MQTT client", e);
             }
         }
     }
