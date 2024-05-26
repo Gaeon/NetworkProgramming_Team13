@@ -59,26 +59,24 @@ public class LiarGameMain {
                 if (!client_id.isEmpty()) {
                     try {
                         // Initialize and connect the MQTT client
-                        client = new MqttClient(broker, MqttClient.generateClientId());
+                        client = new MqttClient(broker, client_id);
 
                         // Set the callback for the client
                         client.setCallback(new MqttCallback() {
                             @Override
                             public void connectionLost(Throwable cause) {
-                                // handle lost connection
                                 System.out.println("Connection lost: " + cause.getMessage());
+                                reconnect();
                             }
 
                             @Override
                             public void messageArrived(String topic, MqttMessage message) throws Exception {
-                                // handle incoming messages
                                 String payload = new String(message.getPayload());
                                 handleIncomingMessage(payload);
                             }
 
                             @Override
                             public void deliveryComplete(IMqttDeliveryToken token) {
-                                // handle delivery complete
                             }
                         });
 
@@ -137,7 +135,6 @@ public class LiarGameMain {
         createRoomButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // Create a new game room
                 Data.C_Base base = new Data.C_Base(Constant.C_GAMEROOMMAKE, client_id, "all", System.currentTimeMillis(), client_id);
                 Gson gson = new Gson();
                 String message = gson.toJson(base);
@@ -152,7 +149,6 @@ public class LiarGameMain {
         refreshButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // Refresh action
                 Data.C_Base base = new Data.C_Base(Constant.C_REFRESH, client_id, "server", System.currentTimeMillis(), client_id);
                 Data.C_refresh refresh = new Data.C_refresh(base);
                 Gson gson = new Gson();
@@ -173,15 +169,13 @@ public class LiarGameMain {
     private void handleIncomingMessage(String message) {
         Gson gson = new Gson();
         Data.C_Base base = gson.fromJson(message, Data.C_Base.class);
-        System.out.println("해결1");
-        System.out.print(base.type());
+
         switch (base.type()) {
             case Constant.C_GAMEROOMMAKE:
-                // Parse the specific C_gameroommake message and create a room panel
-                System.out.print("해결2");
                 createRoomPanel(base.sender(), base.roomId());
                 break;
             case Constant.C_GAMEROOMENTER:
+                // Handle game room enter logic
                 break;
             // handle other message types as needed
         }
@@ -200,7 +194,6 @@ public class LiarGameMain {
         joinButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // Handle join room action
                 Data.C_Base base = new Data.C_Base(Constant.C_GAMEROOMENTER, client_id, "server", System.currentTimeMillis(), roomId);
                 Data.C_gameroomenter gameroomenter = new Data.C_gameroomenter(base);
                 Gson gson = new Gson();
@@ -215,11 +208,26 @@ public class LiarGameMain {
         roomsPanel.repaint();
     }
 
-    public boolean send(String topic, String msg) { // Function to send a message as a string
+    private void reconnect() {
         try {
-            // Create a message to send to the broker - MqttMessage
+            while (!client.isConnected()) {
+                System.out.println("Reconnecting...");
+                client.reconnect();
+                Thread.sleep(2000); // Wait for 2 seconds before retrying
+            }
+        } catch (MqttException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean send(String topic, String msg) {
+        try {
+            if (!client.isConnected()) {
+                System.out.println("Client is not connected. Cannot send message.");
+                reconnect();
+            }
             MqttMessage message = new MqttMessage();
-            message.setPayload(msg.getBytes()); // Actual message to send to the broker
+            message.setPayload(msg.getBytes());
             client.publish(topic, message);
         } catch (MqttException e) {
             e.printStackTrace();
@@ -228,7 +236,7 @@ public class LiarGameMain {
         return true;
     }
 
-    public void close() { // Disconnect and close the mqtt client
+    public void close() {
         if (client != null) {
             try {
                 client.disconnect();
