@@ -1,0 +1,220 @@
+1. Client 클래스 수정
+클라이언트가 라이어를 투표하고 MQTT를 통해 결과를 전송하는 과정을 구현합니다.
+
+java
+코드 복사
+package com.example.gamehandler;
+
+import com.google.gson.Gson;
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class Client {
+    private String userId;
+    private int roomID;
+    private boolean liar;
+    private MqttClient mqttClient;
+    private Gson gson;
+    private List<String> liars = new ArrayList<>();
+    private List<String> participantsId = new ArrayList<>();
+    private String brokerUrl = "tcp://test.mosquitto.org:1883";
+
+    public Client(String userId, int roomID) {
+        this.userId = userId;
+        this.roomID = roomID;
+        this.gson = new Gson();
+        try {
+            mqttClient = new MqttClient(brokerUrl, userId, null);
+            MqttConnectOptions connOpts = new MqttConnectOptions();
+            connOpts.setCleanSession(true);
+            mqttClient.connect(connOpts);
+
+            mqttClient.setCallback(new MqttCallback() {
+                @Override
+                public void connectionLost(Throwable cause) {
+                    System.out.println("Connection lost: " + cause.getMessage());
+                }
+
+                @Override
+                public void messageArrived(String topic, MqttMessage message) throws Exception {
+                    String jsonMessage = new String(message.getPayload());
+                    Map<String, Object> payload = gson.fromJson(jsonMessage, Map.class);
+                    String type = (String) payload.get("type");
+
+                    switch (type) {
+                        case "vote":
+                            handleVote(payload);
+                            break;
+                        case "result":
+                            handleResult(payload);
+                            break;
+                    }
+                }
+
+                @Override
+                public void deliveryComplete(IMqttDeliveryToken token) {
+                }
+            });
+        } catch (MqttException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 투표 메시지 처리
+    private void handleVote(Map<String, Object> payload) {
+        String liar = (String) payload.get("liar");
+        liars.add(liar);
+        System.out.println("Vote received for: " + liar);
+        
+        // 투표 결과 집계 및 결과 전송
+        if (liars.size() == participantsId.size()) {
+            Map<String, Object> resultPayload = new ConcurrentHashMap<>();
+            resultPayload.put("type", "result");
+            resultPayload.put("liars", liars);
+            resultPayload.put("participantsId", participantsId);
+            resultPayload.put("myId", userId);
+
+            String resultJson = gson.toJson(resultPayload);
+            publish("game/result", resultJson);
+        }
+    }
+
+    // 결과 메시지 처리
+    private void handleResult(Map<String, Object> payload) {
+        List<String> liars = (List<String>) payload.get("liars");
+        boolean isLiar = liars.contains(userId);
+        if (isLiar) {
+            System.out.println("You are the liar and you have been caught!");
+        } else {
+            System.out.println("You are not the liar. The liar has been caught!");
+        }
+    }
+
+    // 투표 전송
+    public void sendVote(String selectedLiar) {
+        Map<String, Object> votePayload = new ConcurrentHashMap<>();
+        votePayload.put("type", "vote");
+        votePayload.put("liar", selectedLiar);
+
+        String voteJson = gson.toJson(votePayload);
+        publish("game/vote", voteJson);
+    }
+
+    // 메시지 발행
+    private void publish(String topic, String content) {
+        try {
+            MqttMessage message = new MqttMessage(content.getBytes());
+            mqttClient.publish(topic, message);
+        } catch (MqttException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 토픽 구독
+    public void subscribe(String topic) {
+        try {
+            mqttClient.subscribe(topic);
+        } catch (MqttException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void disconnect() throws MqttException {
+        if (mqttClient != null) {
+            mqttClient.disconnect();
+        }
+    }
+
+    public static void main(String[] args) {
+        Client client = new Client("testUser", 123);
+        client.subscribe("game/#");
+
+        // For testing, simulate a vote
+        client.sendVote("liarUserId");
+    }
+}
+2. 게임 설정 및 실행
+게임 실행 과정에서 클라이언트들이 투표를 통해 라이어를 선정하고, 결과를 집계하는 전체적인 흐름은 다음과 같습니다.
+
+(1) 클라이언트가 투표를 전송
+java
+코드 복사
+public void sendVote(String selectedLiar) {
+    Map<String, Object> votePayload = new ConcurrentHashMap<>();
+    votePayload.put("type", "vote");
+    votePayload.put("liar", selectedLiar);
+
+    String voteJson = gson.toJson(votePayload);
+    publish("game/vote", voteJson);
+}
+(2) 투표 메시지 처리
+java
+코드 복사
+private void handleVote(Map<String, Object> payload) {
+    String liar = (String) payload.get("liar");
+    liars.add(liar);
+    System.out.println("Vote received for: " + liar);
+    
+    // 투표 결과 집계 및 결과 전송
+    if (liars.size() == participantsId.size()) {
+        Map<String, Object> resultPayload = new ConcurrentHashMap<>();
+        resultPayload.put("type", "result");
+        resultPayload.put("liars", liars);
+        resultPayload.put("participantsId", participantsId);
+        resultPayload.put("myId", userId);
+
+        String resultJson = gson.toJson(resultPayload);
+        publish("game/result", resultJson);
+    }
+}
+(3) 결과 메시지 처리
+java
+코드 복사
+private void handleResult(Map<String, Object> payload) {
+    List<String> liars = (List<String>) payload.get("liars");
+    boolean isLiar = liars.contains(userId);
+    if (isLiar) {
+        System.out.println("You are the liar and you have been caught!");
+    } else {
+        System.out.println("You are not the liar. The liar has been caught!");
+    }
+}
+3. 결과 전송
+투표 결과가 집계되면 결과를 전송합니다.
+
+java
+코드 복사
+if (liars.size() == participantsId.size()) {
+    Map<String, Object> resultPayload = new ConcurrentHashMap<>();
+    resultPayload.put("type", "result");
+    resultPayload.put("liars", liars);
+    resultPayload.put("participantsId", participantsId);
+    resultPayload.put("myId", userId);
+
+    String resultJson = gson.toJson(resultPayload);
+    publish("game/result", resultJson);
+}
+4. 결과 수신
+결과를 수신하고 화면에 출력합니다.
+
+java
+코드 복사
+private void handleResult(Map<String, Object> payload) {
+    List<String> liars = (List<String>) payload.get("liars");
+    boolean isLiar = liars.contains(userId);
+    if (isLiar) {
+        System.out.println("You are the liar and you have been caught!");
+    } else {
+        System.out.println("You are not the liar. The liar has been caught!");
+    }
+}
