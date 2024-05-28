@@ -18,7 +18,8 @@ public class Data {
 
 
     public record C_gameroommake(
-            C_Base base
+            C_Base base,
+            String GameTopic
     ) {}
 
     public record C_gameroomcancle(
@@ -33,22 +34,20 @@ public class Data {
             C_Base base
     ) {}
 
-    public record C_gameroominfo(
-            C_Base base
-            // 게임방 정보들(client id 등)
-    ) {}
-
     public record C_gameroomstart(
             C_Base base
     ) {}
 
     public record C_gameroomInfo(
             C_Base base,
-            List<String> participants_name
+            int infotype,//나갔는지 들어왔는지 어떤 타입인지 확인 1이면 들어옴 2면 나감
+            String participant,
+            Integer participants_num
     ) {}
 
     public record C_gameroomenter_confirm(
             C_Base base,
-            List<String> participants_name
+            List<String> participants_name,
+            String GameTopic
     ) {}
-}//
+}

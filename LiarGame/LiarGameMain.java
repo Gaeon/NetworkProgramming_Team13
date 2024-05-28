@@ -21,7 +21,7 @@ public class LiarGameMain {
     private final String topic2 = "game";
     private String broker = "tcp://localhost:1883";
     private String client_id;
-    private int host_flag = 0;
+    private int host_flag = 0;//0은 아무것도 안한 상태,1은 방장,2는 참가자
     private boolean subscribed_flag1 = false;
     private boolean subscribed_flag2 = false;
     private List<RoomPanel> roomPanels = new ArrayList<>();
@@ -143,7 +143,7 @@ public class LiarGameMain {
                     );
 
                     if (selectedTopic != null && !selectedTopic.isEmpty()) {
-                        Data.C_gameroommake m = new Data.C_gameroommake(new Data.C_Base(Constant.C_GAMEROOMMAKE, client_id, "all", System.currentTimeMillis(), client_id));
+                        Data.C_gameroommake m = new Data.C_gameroommake(new Data.C_Base(Constant.C_GAMEROOMMAKE, client_id, "all", System.currentTimeMillis(), client_id),selectedTopic);
                         Gson gson = new Gson();
                         String message = gson.toJson(m);
                         send(topic1, message);
@@ -182,33 +182,29 @@ public class LiarGameMain {
             JsonObject msg = gson.fromJson(message, JsonObject.class);
             JsonObject baseJson = msg.get("base").getAsJsonObject();
             Data.C_Base base = fromJsonToC_Base(baseJson);
-            //json에서 record class로 바꾸려할떄 mqtt와 충돌 발생 이유는 모름
-            System.out.println(base.type());
+            String receiver = base.receiver();
             switch (base.type()) {
                 case Constant.C_REFRESH:
-                    String receiver = base.receiver();
                     if (receiver.equals(client_id)) {
-                        createRoomPanel(base.sender(), base.roomId(),msg.get("participants_num").getAsInt());
+                        createRoomPanel(base.sender(), base.roomId(), msg.get("participants_num").getAsInt());
                     } else if (receiver.equals("host")) {
                         if (host_flag == 1) {
                             Data.C_refresh m_r = new Data.C_refresh(new Data.C_Base(Constant.C_REFRESH, client_id, base.sender(), System.currentTimeMillis(), client_id), gameroom.getParticipants_num());
                             String message_r = gson.toJson(m_r);
-                            System.out.println("받은 refresh에 대해 " + base.sender() + "에게 보냄");
                             send(topic1, message_r);
                         }
                     }
                     break;
                 case Constant.C_GAMEROOMMAKE:
-                    System.out.println("sender: " + base.sender() + " roomId: " + base.roomId());
                     if (base.sender().equals(client_id)) {
                         if (host_flag == 1) {
                             System.out.println("방을 이미 생성했습니다.");
                         } else {
-                            createRoomPanel(base.sender(), base.roomId(),1);
+                            createRoomPanel(base.sender(), base.roomId(), 1);
                             host_flag = 1;
                         }
                     } else {
-                        createRoomPanel(base.sender(), base.roomId(),1);
+                        createRoomPanel(base.sender(), base.roomId(), 1);
                     }
                     break;
                 case Constant.C_GAMEROOMCANCLE:
@@ -221,13 +217,45 @@ public class LiarGameMain {
                     // 게임 방 시작 처리 로직
                     break;
                 case Constant.C_GAMEROOMENTER:
-                    if(base.receiver().equals(client_id))
-                    {
+                    if (base.receiver().equals(client_id)) {
                         gameroom.addParticipant(base.sender());
+                        Data.C_gameroomInfo m_r1 = new Data.C_gameroomInfo(new Data.C_Base(Constant.C_GAMEROOMINFO, client_id, client_id, System.currentTimeMillis(), client_id), 1, base.sender(),gameroom.getParticipants_num());
+                        String message_r1 = gson.toJson(m_r1);
+                        send(topic1, message_r1);
+                        Data.C_gameroomenter_confirm m_r2= new Data.C_gameroomenter_confirm(new Data.C_Base(Constant.C_GAMEROOMENTER_CONFIRM, client_id, base.sender(), System.currentTimeMillis(), client_id), gameroom.getAllParticipants(), gameroom.getGame_topic());
+                        String message_r2 = gson.toJson(m_r2);
+                        send(topic1, message_r2);
                     }
                     break;
                 case Constant.C_GAMEROOMINFO:
                     // 게임 방 정보 처리 로직
+                    if (base.receiver().equals(enter_room)) {
+                        if (msg.get("infotype").getAsInt() == 1) {
+                            gameroom.addParticipant(msg.get("participant").getAsString());
+                        } else if (msg.get("infotype").getAsInt() == 2) {
+                            gameroom.deleteParticipant(msg.get("participant").getAsString());
+                        }
+                    }
+                    for (RoomPanel panel : roomPanels) {
+                        if (panel.gethost().equals(base.sender())) {
+                            panel.setParticipants_num(msg.get("participants_num").getAsInt());
+                            panel.refreshPanel();
+                            break;
+                        }
+                    }
+                    break;
+
+                case Constant.C_GAMEROOMENTER_CONFIRM:
+                    if (receiver.equals(client_id)) {
+                        host_flag = 2;
+                        enter_room = base.sender();
+                        gameroom = new GameRoom(base.sender(), base.sender(), msg.get("GameTopic").getAsString());
+
+                        // participants_name JSON 배열을 가져와서 gameroom에 추가
+                        for (var participantElement : msg.get("participants_name").getAsJsonArray()) {
+                            gameroom.addParticipant(participantElement.getAsString());
+                        }
+                    }
                     break;
                 default:
                     System.out.println("잘못된 메시지 타입: " + base.type());
@@ -237,6 +265,7 @@ public class LiarGameMain {
             LOGGER.log(Level.SEVERE, "Failed to handle incoming message: " + message, e);
         }
     }
+
 
     private void createRoomPanel(String sender, String roomId,int num) {
         if (!isRoomPanelExists(sender)) {
@@ -373,11 +402,13 @@ public class LiarGameMain {
         }
 
         private void joinRoom() {
-            Data.C_Base base = new Data.C_Base(Constant.C_GAMEROOMENTER, client_id, host, System.currentTimeMillis(), roomId);
-            Data.C_gameroomenter gameroomenter = new Data.C_gameroomenter(base);
-            Gson gson = new Gson();
-            String message = gson.toJson(gameroomenter);
-            send(topic1, message);
+            if(host_flag ==0) {
+                Data.C_Base base = new Data.C_Base(Constant.C_GAMEROOMENTER, client_id, host, System.currentTimeMillis(), roomId);
+                Data.C_gameroomenter gameroomenter = new Data.C_gameroomenter(base);
+                Gson gson = new Gson();
+                String message = gson.toJson(gameroomenter);
+                send(topic1, message);
+            }
         }
 
         public String gethost() {
@@ -389,6 +420,13 @@ public class LiarGameMain {
         }
         public void setParticipants_num(int num){
             this.participants_num = num;
+        }
+
+        public void refreshPanel() {
+            JLabel numLabel = (JLabel) this.getComponent(1); // 참가 인원 라벨이 두 번째 컴포넌트라고 가정
+            numLabel.setText("참가자인원 8/" + participants_num);
+            this.revalidate();
+            this.repaint();
         }
     }
 

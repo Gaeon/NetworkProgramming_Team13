@@ -88,6 +88,10 @@ public class GameRoom {
             JOptionPane.showMessageDialog(roomFrame, "The room is full. Cannot add more participants.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+    public void deleteParticipant(String participant) {
+        participants_name.remove(participant);
+        updateParticipantsArea();
+    }
 
     private void updateParticipantsArea() {
         participantsPanel.removeAll();
@@ -104,5 +108,8 @@ public class GameRoom {
     }
     public int getParticipants_num(){
         return participants_name.size();
+    }
+    public String getGame_topic(){
+        return this.game_topic;
     }
 }
