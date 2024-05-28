@@ -8,4 +8,5 @@ public class Constant {
     static final int C_GAMEROOMSTART = 5;
     static final int C_GAMEROOMENTER = 6;
     static final int C_GAMEROOMINFO = 7;
+    final int MAX_PARTICIPANTS = 8;
 }
