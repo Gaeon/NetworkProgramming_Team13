@@ -16,7 +16,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class LiarGameMain {
-    private LiarGameMain liarGameMain = this;
+    private LiarGameMain liarGameMain = this;//
     private MqttClient client;
     private final String topic1 = "control";
     private final String topic2 = "game";
