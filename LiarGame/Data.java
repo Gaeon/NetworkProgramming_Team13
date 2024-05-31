@@ -22,7 +22,7 @@ public class Data {
             String GameTopic
     ) {}
 
-    public record C_gameroomcancle(
+    public record C_gameroomcancel(
             C_Base base
     ) {}
 

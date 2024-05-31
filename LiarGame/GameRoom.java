@@ -1,5 +1,7 @@
 package LiarGame;
 
+import com.google.gson.Gson;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -12,14 +14,18 @@ public class GameRoom {
     private String roomId;
     private String host;
     private String game_topic;
+    private LiarGameMain liarGameMain;
+    private int host_flag;
     private List<String> participants_name = new ArrayList<>();
     private JPanel participantsPanel;
     private JLabel topicField;
 
-    public GameRoom(String host, String roomId, String game_topic) {
+    public GameRoom(String host, String roomId, String game_topic,LiarGameMain liarGameMain,int host_flag) {
         this.host = host;
         this.roomId = roomId;
         this.game_topic = game_topic;
+        this.liarGameMain = liarGameMain;
+        this.host_flag = host_flag;
         createAndShowRoomGUI();
     }
 
@@ -41,10 +47,10 @@ public class GameRoom {
         roomFrame.add(new JScrollPane(participantsPanel), BorderLayout.CENTER);
 
         JPanel bottomPanel = new JPanel();
-        JButton startButton = new JButton("Start Game");
+        JButton startButton = new JButton("게임시작");
         bottomPanel.add(startButton);
 
-        JButton exitButton = new JButton("Exit Room");
+        JButton exitButton = new JButton("게임나가기");
         bottomPanel.add(exitButton);
 
         startButton.addActionListener(new ActionListener() {
@@ -77,7 +83,28 @@ public class GameRoom {
 
     private void exitRoom() {
         // 방 나가기 로직 구현
+        Gson gson = new Gson();
+        System.out.println(host_flag);
+        if(host_flag == 1) {
+            System.out.println("나가기2");
+            Data.C_gameroomcancel m = new Data.C_gameroomcancel(new Data.C_Base(Constant.C_GAMEROOMCANCEL, liarGameMain.getClientId(), host, System.currentTimeMillis(), this.roomId));
+            String message = gson.toJson(m);
+            liarGameMain.send(liarGameMain.getTopic1(),message);
+        }
+        else if(host_flag == 2) {
+            System.out.println("나가기3");
+            Data.C_gameroomexit m = new Data.C_gameroomexit(new Data.C_Base(Constant.C_GAMEROOMEXIT, liarGameMain.getClientId(), host, System.currentTimeMillis(), this.roomId));
+            String message = gson.toJson(m);
+            liarGameMain.send(liarGameMain.getTopic1(),message);
+        }
         roomFrame.dispose();
+        liarGameMain.setEnterRoom(null);
+        liarGameMain.setHostFlag(0);
+    }
+    public void cancelRoom(){
+        roomFrame.dispose();
+        liarGameMain.setEnterRoom(null);
+        liarGameMain.setHostFlag(0);
     }
 
     public void addParticipant(String participant) {

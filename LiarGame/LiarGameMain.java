@@ -16,6 +16,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class LiarGameMain {
+    private LiarGameMain liarGameMain = this;
     private MqttClient client;
     private final String topic1 = "control";
     private final String topic2 = "game";
@@ -147,8 +148,6 @@ public class LiarGameMain {
                         Gson gson = new Gson();
                         String message = gson.toJson(m);
                         send(topic1, message);
-                        gameroom = new GameRoom(client_id, client_id, selectedTopic);
-                        gameroom.addParticipant(client_id);
                     }
                 }
             }
@@ -183,6 +182,7 @@ public class LiarGameMain {
             JsonObject baseJson = msg.get("base").getAsJsonObject();
             Data.C_Base base = fromJsonToC_Base(baseJson);
             String receiver = base.receiver();
+            System.out.println(message);
             switch (base.type()) {
                 case Constant.C_REFRESH:
                     if (receiver.equals(client_id)) {
@@ -202,15 +202,31 @@ public class LiarGameMain {
                         } else {
                             createRoomPanel(base.sender(), base.roomId(), 1);
                             host_flag = 1;
+                            gameroom = new GameRoom(client_id, client_id, msg.get("GameTopic").getAsString(),liarGameMain,host_flag);
+                            gameroom.addParticipant(client_id);
                         }
                     } else {
                         createRoomPanel(base.sender(), base.roomId(), 1);
                     }
                     break;
-                case Constant.C_GAMEROOMCANCLE:
+                case Constant.C_GAMEROOMCANCEL:
                     // 게임 방 취소 처리 로직
+                    System.out.println("삭제1");
+                    if(base.receiver().equals(enter_room))
+                    {
+                        gameroom.cancelRoom();
+                        System.out.println("삭제2");
+                    }
+                    System.out.println("삭제3");
+                    deleteRoomPanel(base.receiver());
                     break;
                 case Constant.C_GAMEROOMEXIT:
+                    if (base.receiver().equals(client_id)) {
+                        gameroom.deleteParticipant(base.sender());
+                        Data.C_gameroomInfo m_r1 = new Data.C_gameroomInfo(new Data.C_Base(Constant.C_GAMEROOMINFO, client_id, client_id, System.currentTimeMillis(), client_id), 2, base.sender(),gameroom.getParticipants_num());
+                        String message_r1 = gson.toJson(m_r1);
+                        send(topic1, message_r1);
+                    }
                     // 게임 방 나가기 처리 로직
                     break;
                 case Constant.C_GAMEROOMSTART:
@@ -249,7 +265,7 @@ public class LiarGameMain {
                     if (receiver.equals(client_id)) {
                         host_flag = 2;
                         enter_room = base.sender();
-                        gameroom = new GameRoom(base.sender(), base.sender(), msg.get("GameTopic").getAsString());
+                        gameroom = new GameRoom(base.sender(), base.sender(), msg.get("GameTopic").getAsString(),liarGameMain,host_flag);
 
                         // participants_name JSON 배열을 가져와서 gameroom에 추가
                         for (var participantElement : msg.get("participants_name").getAsJsonArray()) {
@@ -290,10 +306,10 @@ public class LiarGameMain {
         return false;
     }
 
-    private void deleteRoomPanel(String sender, String roomId) {
+    private void deleteRoomPanel(String roomID) {
         RoomPanel panelToRemove = null;
         for (RoomPanel panel : roomPanels) {
-            if (panel.gethost().equals(sender)) {
+            if (panel.gethost().equals(roomID)) {
                 panelToRemove = panel;
                 break;
             }
@@ -437,5 +453,11 @@ public class LiarGameMain {
         long m_time = baseJson.get("time").getAsLong();
         String m_roomId = baseJson.get("roomId").getAsString();
         return new Data.C_Base(m_Type, m_sender, m_receiver, m_time, m_roomId);
+    }
+    public void setEnterRoom(String enter){
+        this.enter_room = enter;
+    }
+    public void setHostFlag(int flag){
+        this.host_flag = flag;
     }
 }
