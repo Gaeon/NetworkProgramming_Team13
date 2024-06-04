@@ -8,6 +8,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class GameRoom {
     private JFrame roomFrame;
@@ -20,7 +21,7 @@ public class GameRoom {
     private JPanel participantsPanel;
     private JLabel topicField;
 
-    public GameRoom(String host, String roomId, String game_topic,LiarGameMain liarGameMain,int host_flag) {
+    public GameRoom(String host, String roomId, String game_topic,LiarGameMain liarGameMain, int host_flag) {
         this.host = host;
         this.roomId = roomId;
         this.game_topic = game_topic;
@@ -71,13 +72,23 @@ public class GameRoom {
         roomFrame.setVisible(true);
     }
 
-    private void startGame() {
-        String topic = topicField.getText();
-        if (!topic.isEmpty()) {
-            // 게임 시작 로직 구현
-            JOptionPane.showMessageDialog(roomFrame, "Game started with topic: " + topic, "Game Started", JOptionPane.INFORMATION_MESSAGE);
+    public void startGame() {
+        if (participants_name.size() >= Constant.MIN_PARTICIPANTS && participants_name.size() <= Constant.MAX_PARTICIPANTS) {
+            Data.C_gameroomstart startMessage = new Data.C_gameroomstart(
+                    new Data.C_Base(Constant.C_GAMEROOMSTART, liarGameMain.getClientId(), "all", System.currentTimeMillis(), roomId),
+                    participants_name, game_topic);
+            Gson gson = new Gson();
+            String message = gson.toJson(startMessage);
+            liarGameMain.send(liarGameMain.getTopic1(), message);
         } else {
-            JOptionPane.showMessageDialog(roomFrame, "Please enter a topic before starting the game", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(roomFrame, "플레이어가 부족합니다.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public void closeRoom() {
+        if (roomFrame != null) {
+            roomFrame.dispose();
+            roomFrame = null;
         }
     }
 
@@ -138,5 +149,8 @@ public class GameRoom {
     }
     public String getGame_topic(){
         return this.game_topic;
+    }
+    public String getRoomId(){
+        return this.roomId;
     }
 }

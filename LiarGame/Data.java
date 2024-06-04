@@ -35,7 +35,9 @@ public class Data {
     ) {}
 
     public record C_gameroomstart(
-            C_Base base
+            C_Base base,
+            List<String> participants_name,
+            String GameTopic
     ) {}
 
     public record C_gameroomInfo(
