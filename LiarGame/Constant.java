@@ -20,5 +20,5 @@ public class Constant {
     static final int G_RESULT = 16;
 
     public static final int T_FIRSTOPINION = 18000;
-    public static final int T_CHAT = 18000;
+    public static final int T_CHAT = 180000;
 }

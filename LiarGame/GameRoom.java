@@ -150,4 +150,7 @@ public class GameRoom {
     public String getGame_topic(){
         return this.game_topic;
     }
+    public String getRoomId(){
+        return this.roomId;
+    }
 }

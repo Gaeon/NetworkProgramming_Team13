@@ -242,28 +242,28 @@ public class LiarGameMain {
                     break;
                 case Constant.C_GAMEROOMSTART:
                     // 게임 방 시작 처리 로직
-                    client.subscribe(topic2);
-                    subscribed_flag2 = true;
+                    if (base.roomId().equals(gameroom.getRoomId())) {
+                        client.subscribe(topic2);
+                        subscribed_flag2 = true;
+                        gameroom.closeRoom();
 
-                    gameroom.closeRoom();
+                        if (host_flag == 1) {
+                            List<String> participants_name = new ArrayList<>();
+                            for (var participantElement : msg.get("participants_name").getAsJsonArray()) {
+                                participants_name.add(participantElement.getAsString());
+                            }
+                            String game_topic = msg.get("GameTopic").toString();
+                            Random random = new Random();
+                            String liar = participants_name.get(random.nextInt(participants_name.size()));
+                            String word = GameTopic.getRandomWord(game_topic);
 
-                    if (host_flag == 1) {
-                        List<String> participants_name = new ArrayList<>();
-                        for (var participantElement : msg.get("participants_name").getAsJsonArray()) {
-                            participants_name.add(participantElement.getAsString());
+                            GData.G_GameSetting settings = new GData.G_GameSetting(new GData.G_Base(client_id, Constant.G_GAMESETTING, "host", "all", System.currentTimeMillis()), liar, word, false);
+                            gson = new Gson();
+                            message = gson.toJson(settings);
+                            liarGameMain.send(getTopic2(), message);
                         }
-                        String game_topic = msg.get("GameTopic").toString();
-                        Random random = new Random();
-                        String liar = participants_name.get(random.nextInt(participants_name.size()));
-                        String word = GameTopic.getRandomWord(game_topic);
-
-                        GData.G_GameSetting settings = new GData.G_GameSetting(new GData.G_Base(client_id, Constant.G_GAMESETTING, "host", "all", System.currentTimeMillis()), liar, word, false);
-                        gson = new Gson();
-                        message = gson.toJson(settings);
-                        System.out.println(message);
-                        liarGameMain.send(getTopic2(), message);
+                        startGameWindow(msg.get("participants_name").getAsJsonArray(), base.roomId(), msg.get("GameTopic").getAsString());
                     }
-                    startGameWindow(msg.get("participants_name").getAsJsonArray(), base.roomId(), msg.get("GameTopic").getAsString());
                     break;
                 case Constant.C_GAMEROOMENTER:
                     if (base.receiver().equals(client_id)) {
@@ -326,112 +326,120 @@ public class LiarGameMain {
             System.out.println(message);
             switch (base.type()) {
                 case Constant.G_GAMESETTING:
-                    if (host_flag == 1 && receiver.equals("host")) {
-                        if (msg.get("status").getAsBoolean()) {
-                            count++;
-                            System.out.println(count);
-                            if (count == gameroom.getParticipants_num()) {
-                                GData.G_GameStart gamestart = new GData.G_GameStart(new GData.G_Base(client_id, Constant.G_GAMESTART, client_id, "all", System.currentTimeMillis()));
-                                String gamestartmsg = gson.toJson(gamestart);
-                                send(getTopic2(), gamestartmsg);
-                                count = 0;
-                            }
-                        }
-                    }
-                    if (sender.equals("host")) {
-                        String liar = msg.get("liar").getAsString();
-                        if (liar.equals(client_id)) {
-                            for (GameWindow window : activeGameWindows) {
-                                if (window.getRoomId().equals(base.id())) {
-                                    window.updateRoleAndKeyword(true, null);
-                                    break;
+                    if (base.id().equals(gameroom.getRoomId())){
+                        if (host_flag == 1 && receiver.equals("host")) {
+                            if (msg.get("status").getAsBoolean()) {
+                                count++;
+                                System.out.println(count);
+                                if (count == gameroom.getParticipants_num()) {
+                                    GData.G_GameStart gamestart = new GData.G_GameStart(new GData.G_Base(client_id, Constant.G_GAMESTART, client_id, "all", System.currentTimeMillis()));
+                                    String gamestartmsg = gson.toJson(gamestart);
+                                    send(getTopic2(), gamestartmsg);
+                                    count = 0;
                                 }
                             }
-                        } else {
-                            String keyword = msg.get("keyword").getAsString();
-                            for (GameWindow window : activeGameWindows) {
-                                if (window.getRoomId().equals(base.id())) {
-                                    window.updateRoleAndKeyword(false, keyword);
-                                    break;
+                        }
+                        if (sender.equals("host")) {
+                            String liar = msg.get("liar").getAsString();
+                            if (liar.equals(client_id)) {
+                                for (GameWindow window : activeGameWindows) {
+                                    if (window.getRoomId().equals(base.id())) {
+                                        window.updateRoleAndKeyword(true, null);
+                                        break;
+                                    }
+                                }
+                            } else {
+                                String keyword = msg.get("keyword").getAsString();
+                                for (GameWindow window : activeGameWindows) {
+                                    if (window.getRoomId().equals(base.id())) {
+                                        window.updateRoleAndKeyword(false, keyword);
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
                     break;
                 case Constant.G_GAMESTART:
-                    for (GameWindow window : activeGameWindows) {
-                        if (window.getRoomId().equals(base.id())) {
-                            window.chatWindow(); // 채팅 GUI 활성화
-                            if (host_flag == 1) {
-                                GData.G_FirstOpinion firstOpinion = new GData.G_FirstOpinion(new GData.G_Base(client_id, Constant.G_FIRSTOPINION, "host", "host", System.currentTimeMillis()), "0");
-                                String firstopinionmsg = gson.toJson(firstOpinion);
-                                send(getTopic2(), firstopinionmsg);
+                    if (base.id().equals(gameroom.getRoomId())){
+                        for (GameWindow window : activeGameWindows) {
+                            if (window.getRoomId().equals(base.id())) {
+                                window.chatWindow(); // 채팅 GUI 활성화
+                                if (host_flag == 1) {
+                                    GData.G_FirstOpinion firstOpinion = new GData.G_FirstOpinion(new GData.G_Base(client_id, Constant.G_FIRSTOPINION, "host", "host", System.currentTimeMillis()), "0");
+                                    String firstopinionmsg = gson.toJson(firstOpinion);
+                                    send(getTopic2(), firstopinionmsg);
+                                    break;
+                                }
                                 break;
                             }
-                            break;
                         }
                     }
                     break;
                 case Constant.G_FIRSTOPINION:
-                    if (receiver.equals("host")) {
-                        if (host_flag == 1 && sender.equals("host")) {
-                            List<String> participants = gameroom.getAllParticipants();
+                    if (base.id().equals(gameroom.getRoomId())) {
+                        if (receiver.equals("host")) {
+                            if (host_flag == 1 && sender.equals("host")) {
+                                List<String> participants = gameroom.getAllParticipants();
 
-                            GameServer gameServer = new GameServer(client_id, "game", participants, liarGameMain);
-                            gameServer.FirstOpinionTimer();
-                        }
-                    } else {
-                        if (base.sender().equals("host")) {
-                            if (receiver.equals(client_id)) {
-                                for (GameWindow window : activeGameWindows) {
-                                    if (window.getRoomId().equals(base.id())) {
-                                        window.activateChatField();
-                                        window.receiveOpinionMessage("HOST", "키워드에 대한 설명을 진행해주세요");
-                                        break;
-                                    }
-                                }
-                            } else {
-                                for (GameWindow window : activeGameWindows) {
-                                    if (window.getRoomId().equals(base.id())) {
-                                        window.deactivateChatField();
-                                        break;
-                                    }
-                                }
+                                GameServer gameServer = new GameServer(client_id, "game", participants, liarGameMain);
+                                gameServer.FirstOpinionTimer();
                             }
-                        } else if (!base.sender().equals(client_id)) {
-                            // 다른 사람의 키워드에 대한 설명을 받은 경우
-                            // 채팅창에 띄워줌
-                            for (GameWindow window : activeGameWindows) {
-                                if (window.getRoomId().equals(base.id())) {
-                                    window.receiveOpinionMessage(base.sender(), msg.get("message").toString());
-                                    break;
+                        } else {
+                            if (base.sender().equals("host")) {
+                                if (receiver.equals(client_id)) {
+                                    for (GameWindow window : activeGameWindows) {
+                                        if (window.getRoomId().equals(base.id())) {
+                                            window.activateChatField();
+                                            window.receiveOpinionMessage("HOST", "키워드에 대한 설명을 진행해주세요");
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    for (GameWindow window : activeGameWindows) {
+                                        if (window.getRoomId().equals(base.id())) {
+                                            window.deactivateChatField();
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else if (!base.sender().equals(client_id)) {
+                                // 다른 사람의 키워드에 대한 설명을 받은 경우
+                                // 채팅창에 띄워줌
+                                for (GameWindow window : activeGameWindows) {
+                                    if (window.getRoomId().equals(base.id())) {
+                                        window.receiveOpinionMessage(base.sender(), msg.get("message").toString());
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
                     break;
                 case Constant.G_CHAT:
-                    if (base.sender().equals("host")) {
-                        if (host_flag == 1) {
-                            GameServer gameServer = new GameServer(client_id, "game", null, liarGameMain);
-                            gameServer.ChatTimer();
-                        }
-                        for (GameWindow window : activeGameWindows) {
-                            if (window.getRoomId().equals(base.id())) {
-                                window.startChat();
-                                window.receiveOpinionMessage("HOST", "!!!180초동안 자유롭게 토론을 진행해주세요!!");
-                                window.activateChatField();
-                                break;
+                    if (base.id().equals(gameroom.getRoomId())){
+                        if (base.sender().equals("host")) {
+                            if (host_flag == 1) {
+                                GameServer gameServer = new GameServer(client_id, "game", null, liarGameMain);
+                                gameServer.ChatTimer();
+                            }
+                            for (GameWindow window : activeGameWindows) {
+                                if (window.getRoomId().equals(base.id())) {
+                                    window.startChat();
+                                    window.receiveOpinionMessage("HOST", "!!!180초동안 자유롭게 토론을 진행해주세요!!");
+                                    window.activateChatField();
+                                    break;
+                                }
                             }
                         }
-                    }
-                    if (!base.sender().equals("host") && !base.sender().equals(client_id)) {
-                        for (GameWindow window : activeGameWindows) {
-                            if (window.getRoomId().equals(base.id())) {
-                                window.startChat();
-                                window.receiveOpinionMessage(base.sender(), msg.get("chat").toString());
-                                window.activateChatField();
-                                break;
+                        if (!base.sender().equals("host") && !base.sender().equals(client_id)) {
+                            for (GameWindow window : activeGameWindows) {
+                                if (window.getRoomId().equals(base.id())) {
+                                    window.startChat();
+                                    window.receiveOpinionMessage(base.sender(), msg.get("chat").toString());
+                                    window.activateChatField();
+                                    break;
+                                }
                             }
                         }
                     }

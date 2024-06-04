@@ -153,7 +153,7 @@ public class GameWindow {
 	private void sendStatusMessage() {
 		Gson gson = new Gson();
 		GData.G_GameSetting statusMessage = new GData.G_GameSetting(
-				new GData.G_Base(clientId, Constant.G_GAMESETTING, clientId, "host", System.currentTimeMillis()),
+				new GData.G_Base(roomId, Constant.G_GAMESETTING, clientId, "host", System.currentTimeMillis()),
 				"0", "0", true
 		);
 		String message = gson.toJson(statusMessage);
