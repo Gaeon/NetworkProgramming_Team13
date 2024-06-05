@@ -36,6 +36,8 @@ public class LiarGameMain {
     private String enter_room = null;
     private Set<GameWindow> activeGameWindows = new HashSet<>();
     private Map<String, Integer> voteCount = new HashMap<>();
+    private String liar = null;
+    private boolean isLiar = false;
 
     public LiarGameMain() {
         createAndShowLoginGUI();
@@ -254,7 +256,7 @@ public class LiarGameMain {
                             }
                             String game_topic = msg.get("GameTopic").toString();
                             Random random = new Random();
-                            String liar = participants_name.get(random.nextInt(participants_name.size()));
+                            liar = participants_name.get(random.nextInt(participants_name.size()));
                             String word = GameTopic.getRandomWord(game_topic);
 
                             GData.G_GameSetting settings = new GData.G_GameSetting(new GData.G_Base(client_id, Constant.G_GAMESETTING, "host", "all", System.currentTimeMillis()), liar, word, false);
@@ -342,6 +344,7 @@ public class LiarGameMain {
                         if (sender.equals("host")) {
                             String liar = msg.get("liar").getAsString();
                             if (liar.equals(client_id)) {
+                                isLiar = true;
                                 for (GameWindow window : activeGameWindows) {
                                     if (window.getRoomId().equals(base.id())) {
                                         window.updateRoleAndKeyword(true, null);
@@ -426,7 +429,7 @@ public class LiarGameMain {
                             for (GameWindow window : activeGameWindows) {
                                 if (window.getRoomId().equals(base.id())) {
                                     window.startChat();
-                                    window.receiveOpinionMessage("HOST", "!!!180초동안 자유롭게 토론을 진행해주세요!!");
+                                    window.receiveChatMessage("HOST", "!!!180초동안 자유롭게 토론을 진행해주세요!!");
                                     window.activateChatField();
                                     break;
                                 }
@@ -436,7 +439,7 @@ public class LiarGameMain {
                             for (GameWindow window : activeGameWindows) {
                                 if (window.getRoomId().equals(base.id())) {
                                     window.startChat();
-                                    window.receiveOpinionMessage(base.sender(), msg.get("chat").toString());
+                                    window.receiveChatMessage(base.sender(), msg.get("chat").toString());
                                     window.activateChatField();
                                     break;
                                 }
@@ -445,33 +448,61 @@ public class LiarGameMain {
                     }
                     break;
                 case Constant.G_VOTE:
-//                    if (host_flag == 1 && receiver.equals("host")) {
-//                        List<String> participants = gameroom.getAllParticipants();
-//                        if (sender.equals("host")) {
-//                            GData.G_Vote voteStartMessage = new GData.G_Vote(new GData.G_Base(client_id, Constant.G_VOTE, "host", "all", System.currentTimeMillis()), participants, null);
-//                            String voteStartMsg = gson.toJson(voteStartMessage);
-//                            liarGameMain.send(liarGameMain.getTopic2(), voteStartMsg);
-//                        } else {
-//                            String votedPlayer = msg.get("votedLiar").toString();
-//                            voteCount.put(votedPlayer, voteCount.getOrDefault(votedPlayer, 0) + 1);
-//                            if (voteCount.size() == gameroom.getParticipants_num()) {
-//                                String mostVotedPlayer = Collections.max(voteCount.entrySet(), Map.Entry.comparingByValue()).getKey();
-//                                GData.G_Result voteResultMessage = new GData.G_Result(new GData.G_Base(client_id, Constant.G_RESULT, "host", "all", System.currentTimeMillis()), mostVotedPlayer, 0);
-//                                String voteResultMsg = gson.toJson(voteResultMessage);
-//                                send(topic2, voteResultMsg);
-//                            }
-//                            break;
-//                        }
-//                    } else if (base.sender().equals("host")){
-//                        for (GameWindow window : activeGameWindows) {
-//                            if (window.getRoomId().equals(base.id())) {
-//                                window.showVoteDialog(gameroom.getAllParticipants()); // 투표 창을 열어서 participants 정보 전달
-//                                break;
-//                            }
-//                        }
-//                    }
-//                    break;
+                    if (base.id().equals(gameroom.getRoomId())) {
+                        if (host_flag == 1 && receiver.equals("host")) {
+                            List<String> participants = gameroom.getAllParticipants();
+                            if (sender.equals("host")) {
+                                GData.G_Vote voteStartMessage = new GData.G_Vote(new GData.G_Base(client_id, Constant.G_VOTE, "host", "all", System.currentTimeMillis()), participants, null);
+                                String voteStartMsg = gson.toJson(voteStartMessage);
+                                liarGameMain.send(liarGameMain.getTopic2(), voteStartMsg);
+                            } else {
+                                String votedPlayer = msg.get("votedLiar").getAsString();
+                                voteCount.put(votedPlayer, voteCount.getOrDefault(votedPlayer, 0) + 1);
+                                count++;
+                                if (count == gameroom.getParticipants_num()) {
+                                    String mostVotedPlayer = Collections.max(voteCount.entrySet(), Map.Entry.comparingByValue()).getKey();
+                                    GData.G_Result voteResultMessage = new GData.G_Result(new GData.G_Base(client_id, Constant.G_RESULT, "host", "all", System.currentTimeMillis()), mostVotedPlayer, liar);
+                                    String voteResultMsg = gson.toJson(voteResultMessage);
+                                    send(topic2, voteResultMsg);
+                                }
+                            }
+                        } else if (base.sender().equals("host")) {
+                            for (GameWindow window : activeGameWindows) {
+                                if (window.getRoomId().equals(base.id())) {
+                                    window.showVoteDialog(gameroom.getAllParticipants()); // 투표 창을 열어서 participants 정보 전달
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    break;
                 case Constant.G_RESULT:
+                    if (base.id().equals(gameroom.getRoomId())) {
+                        String votedLiar = msg.get("votedLiar").toString();
+                        String liar = msg.get("liar").toString();
+                        boolean isLiarCorrect = votedLiar.equals(liar);
+
+                        for (GameWindow window : activeGameWindows) {
+                            if (window.getRoomId().equals(base.id())) {
+                                window.showResultDialog(isLiarCorrect, votedLiar, liar, host_flag);
+                                break;
+                            }
+                        }
+                        // 게임방 삭제
+//                        String roomId = base.id().toString();
+//                        deleteRoomPanel(roomId);
+//                        if (host_flag == 1) {
+//                            Data.C_gameroomcancel roomcancle = new Data.C_gameroomcancel(new Data.C_Base(Constant.C_GAMEROOMCANCEL, liarGameMain.getClientId(), "host", System.currentTimeMillis(), roomId));
+//                            message = gson.toJson(roomcancle);
+//                            liarGameMain.send(liarGameMain.getTopic1(),message);
+//                        } else {
+//                            Data.C_gameroomexit gameroomexit = new Data.C_gameroomexit(new Data.C_Base(Constant.C_GAMEROOMEXIT, liarGameMain.getClientId(), "host", System.currentTimeMillis(), roomId));
+//                            message = gson.toJson(gameroomexit);
+//                        }
+//                        liarGameMain.send(liarGameMain.getTopic1(),message);
+//                        setEnterRoom(null);
+//                        setHostFlag(0);
+                    }
                     break;
                 default:
                     System.out.println("잘못된 메시지 타입: " + base.type());
@@ -679,5 +710,8 @@ public class LiarGameMain {
     }
     public void setHostFlag(int flag){
         this.host_flag = flag;
+    }
+    public MqttClient getClient() {
+        return client;
     }
 }

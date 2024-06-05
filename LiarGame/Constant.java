@@ -10,7 +10,7 @@ public class Constant {
     static final int C_GAMEROOMINFO = 7;
     static final int C_GAMEROOMENTER_CONFIRM=8;
     public static final int MAX_PARTICIPANTS = 8;
-    public static final int MIN_PARTICIPANTS = 3;
+    public static final int MIN_PARTICIPANTS = 2;
 
     static final int G_GAMESETTING = 11;
     static final int G_GAMESTART = 12;
@@ -20,5 +20,5 @@ public class Constant {
     static final int G_RESULT = 16;
 
     public static final int T_FIRSTOPINION = 18000;
-    public static final int T_CHAT = 180000;
+    public static final int T_CHAT = 18000;
 }

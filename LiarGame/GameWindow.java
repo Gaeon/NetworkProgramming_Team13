@@ -1,6 +1,7 @@
 package LiarGame;
 
 import com.google.gson.Gson;
+import org.eclipse.paho.client.mqttv3.MqttException;
 
 import javax.swing.*;
 import java.awt.*;
@@ -25,7 +26,7 @@ public class GameWindow {
 	private boolean roleWindowShown = false;
 	private boolean chatWindowShown = false;
 	private boolean isVoteDialogOpen = false;
-	private JButton sendButton; // sendButton을 멤버 변수로 선언
+	private JButton sendButton;
 
 	public GameWindow(List<String> participants, String roomId, String topic, String clientId, LiarGameMain liarGameMain) {
 		this.participants = participants;
@@ -253,5 +254,49 @@ public class GameWindow {
 		Gson gson = new Gson();
 		String voteJson = gson.toJson(voteMessage);
 		liarGameMain.send(liarGameMain.getTopic2(), voteJson);
+	}
+
+	public void showResultDialog(boolean isLiarCorrect, String votedLiar, String actualLiar, int host_flag) {
+		JFrame resultFrame = new JFrame("Result");
+		resultFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		resultFrame.setSize(300, 200);
+		resultFrame.setLayout(new BorderLayout());
+
+		JPanel panel = new JPanel();
+		panel.setLayout(new GridLayout(4, 1));
+
+		String resultMessage;
+		if (isLiar && !isLiarCorrect || !isLiar && isLiarCorrect) {
+			resultMessage = "승리했습니다!";
+		} else {
+			resultMessage = "오답입니다!";
+		}
+		JLabel resultLabel = new JLabel(resultMessage);
+		JLabel votedLabel = new JLabel("가장많이 지목당한 플레이어: " + votedLiar);
+		JLabel actualLabel = new JLabel("실제 라이어: " + actualLiar);
+
+		panel.add(resultLabel);
+		panel.add(votedLabel);
+		panel.add(actualLabel);
+
+		JButton confirmButton = new JButton("확인");
+		confirmButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				try {
+					liarGameMain.getClient().unsubscribe(liarGameMain.getTopic2());
+				} catch (MqttException ex) {
+					throw new RuntimeException(ex);
+				}
+				resultFrame.dispose();
+				gameFrame.dispose(); // 게임 창 닫기
+			}
+		});
+
+
+		panel.add(confirmButton);
+
+		resultFrame.add(panel, BorderLayout.CENTER);
+		resultFrame.setVisible(true);
 	}
 }
