@@ -41,7 +41,6 @@ public class GData {
 	public record G_Result(
 			G_Base base,
 			String votedLiar,
-			String liar,
-			boolean winner
+			String liar
 	) {}
 }
