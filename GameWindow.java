@@ -201,7 +201,6 @@ public class GameWindow {
         if (isVoteDialogOpen) {
             return; // 이미 투표 창이 열려 있는 경우 실행하지 않음
         }
-
         isVoteDialogOpen = true; // 투표 창이 열렸음을 표시
 
         JFrame voteFrame = new JFrame("Vote");
@@ -210,21 +209,29 @@ public class GameWindow {
         voteFrame.setLayout(new BorderLayout());
 
         JPanel panel = new JPanel();
-        panel.setLayout(new GridLayout(participants.size() + 1, 1));
+        panel.setBackground(new Color(245, 245, 245)); // 배경색 설정
+        panel.setLayout(new GridLayout(participants.size() + 1, 1, 5, 5)); // 그리드 레이아웃 간격 설정
 
         JLabel titleLabel = new JLabel("Vote for a player:");
+        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 14));
         panel.add(titleLabel);
 
         ButtonGroup group = new ButtonGroup();
 
-        // Create radio buttons for each participant
+        // 각 참가자에 대한 라디오 버튼 생성
         for (String participant : participants) {
             JRadioButton radioButton = new JRadioButton(participant);
+            radioButton.setBackground(new Color(255, 255, 255));
+            radioButton.setFont(new Font("Arial", Font.PLAIN, 12));
             group.add(radioButton);
             panel.add(radioButton);
         }
 
         JButton confirmButton = new JButton("Vote");
+        confirmButton.setFont(new Font("Arial", Font.BOLD, 12));
+        confirmButton.setForeground(Color.WHITE);
+        confirmButton.setBackground(new Color(34, 139, 34)); // 버튼 색상 변경
         confirmButton.addActionListener(e -> {
             String selectedParticipant = null;
             for (Enumeration<AbstractButton> buttons = group.getElements(); buttons.hasMoreElements();) {
@@ -299,4 +306,8 @@ public class GameWindow {
         resultFrame.add(panel, BorderLayout.CENTER);
         resultFrame.setVisible(true);
     }
+
+    public void receiveVote(String selectedParticipant) {
+    }
+
 }

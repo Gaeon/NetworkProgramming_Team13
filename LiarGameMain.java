@@ -118,6 +118,18 @@ public class LiarGameMain {
 
         frame.setVisible(true);
     }
+    private void createAndRequest(String roomId) {
+        // 방이 생성될 때 실행되는 로직을 구현
+        roomPanels.stream()
+                .filter(rp -> rp.getRoomId().equals(roomId))
+                .findFirst()
+                .ifPresent(rp -> {
+                    roomsPanel.remove(rp);
+                    roomPanels.remove(rp);
+                    roomsPanel.revalidate();
+                    roomsPanel.repaint();
+                });
+    }
 
     private void createAndShowGameGUI() {
         gameFrame = new JFrame("Liar Game");
@@ -364,17 +376,16 @@ public class LiarGameMain {
                     }
                     break;
                 case Constant.G_GAMESTART:
-                    if (base.id().equals(gameroom.getRoomId())){
+                    // 게임 방이 시작될 때
+                    if (base.id().equals(gameroom.getRoomId())) {
                         for (GameWindow window : activeGameWindows) {
                             if (window.getRoomId().equals(base.id())) {
-                                window.chatWindow(); // 채팅 GUI 활성화
+                                window.chatWindow(); // 채팅 GUI를 활성화합니다.
                                 if (host_flag == 1) {
                                     GData.G_FirstOpinion firstOpinion = new GData.G_FirstOpinion(new GData.G_Base(client_id, Constant.G_FIRSTOPINION, "host", "host", System.currentTimeMillis()), "0");
                                     String firstopinionmsg = gson.toJson(firstOpinion);
                                     send(getTopic2(), firstopinionmsg);
-                                    break;
                                 }
-                                break;
                             }
                         }
                     }
@@ -441,7 +452,6 @@ public class LiarGameMain {
                                     window.startChat();
                                     window.receiveChatMessage(base.sender(), msg.get("chat").toString());
                                     window.activateChatField();
-                                    break;
                                 }
                             }
                         }
@@ -477,6 +487,7 @@ public class LiarGameMain {
                     }
                     break;
                 case Constant.G_RESULT:
+                    // 게임 결과를 표시하는 단곀
                     if (base.id().equals(gameroom.getRoomId())) {
                         String votedLiar = msg.get("votedLiar").toString();
                         String liar = msg.get("liar").toString();
@@ -485,23 +496,10 @@ public class LiarGameMain {
                         for (GameWindow window : activeGameWindows) {
                             if (window.getRoomId().equals(base.id())) {
                                 window.showResultDialog(isLiarCorrect, votedLiar, liar, host_flag);
-                                break;
+                                // 게임방 삭제
+                                deleteRoomPanel(base.id().toString());
                             }
                         }
-                        // 게임방 삭제
-//                        String roomId = base.id().toString();
-//                        deleteRoomPanel(roomId);
-//                        if (host_flag == 1) {
-//                            Data.C_gameroomcancel roomcancle = new Data.C_gameroomcancel(new Data.C_Base(Constant.C_GAMEROOMCANCEL, liarGameMain.getClientId(), "host", System.currentTimeMillis(), roomId));
-//                            message = gson.toJson(roomcancle);
-//                            liarGameMain.send(liarGameMain.getTopic1(),message);
-//                        } else {
-//                            Data.C_gameroomexit gameroomexit = new Data.C_gameroomexit(new Data.C_Base(Constant.C_GAMEROOMEXIT, liarGameMain.getClientId(), "host", System.currentTimeMillis(), roomId));
-//                            message = gson.toJson(gameroomexit);
-//                        }
-//                        liarGameMain.send(liarGameMain.getTopic1(),message);
-//                        setEnterRoom(null);
-//                        setHostFlag(0);
                     }
                     break;
                 default:
