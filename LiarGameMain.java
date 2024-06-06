@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import jdk.internal.access.JavaIOFileDescriptorAccess;
 import org.eclipse.paho.client.mqttv3.*;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
@@ -20,7 +21,7 @@ import java.util.logging.Logger;
 public class LiarGameMain {
     private LiarGameMain liarGameMain = this;//
     private MqttClient client;
-    private final String topic1 = "control";
+    private String topic1 = "control";
     private final String topic2 = "game";
     private String broker = "tcp://localhost:1883";
     private String client_id;
@@ -38,6 +39,8 @@ public class LiarGameMain {
     private Map<String, Integer> voteCount = new HashMap<>();
     private String liar = null;
     private boolean isLiar = false;
+    private String clientId;
+    private JavaIOFileDescriptorAccess baseoJson;
 
     public LiarGameMain() {
         createAndShowLoginGUI();
@@ -207,7 +210,7 @@ public class LiarGameMain {
             JsonObject baseJson = msg.get("base").getAsJsonObject();
             Data.C_Base base = fromJsonToC_Base(baseJson);
             String receiver = base.receiver();
-            System.out.println(message);
+
             switch (base.type()) {
                 case Constant.C_REFRESH:
                     if (receiver.equals(client_id)) {
@@ -235,15 +238,8 @@ public class LiarGameMain {
                     }
                     break;
                 case Constant.C_GAMEROOMCANCEL:
-                    // 게임 방 취소 처리 로직
-                    System.out.println("삭제1");
-                    if(base.receiver().equals(enter_room))
-                    {
-                        gameroom.cancelRoom();
-                        System.out.println("삭제2");
-                    }
-                    System.out.println("삭제3");
-                    deleteRoomPanel(base.receiver());
+                    // 방 삭제 메시지를 받으면 로컬에서 방 목록을 갱신
+                    deleteRoomPanel(base.roomId());
                     break;
                 case Constant.C_GAMEROOMEXIT:
                     if (base.receiver().equals(client_id)) {
@@ -487,19 +483,18 @@ public class LiarGameMain {
                     }
                     break;
                 case Constant.G_RESULT:
-                    // 게임 결과를 표시하는 단곀
                     if (base.id().equals(gameroom.getRoomId())) {
-                        String votedLiar = msg.get("votedLiar").toString();
-                        String liar = msg.get("liar").toString();
+                        String votedLiar = msg.get("votedLiar").getAsString();
+                        String liar = msg.get("liar").getAsString();
                         boolean isLiarCorrect = votedLiar.equals(liar);
 
                         for (GameWindow window : activeGameWindows) {
                             if (window.getRoomId().equals(base.id())) {
                                 window.showResultDialog(isLiarCorrect, votedLiar, liar, host_flag);
-                                // 게임방 삭제
-                                deleteRoomPanel(base.id().toString());
                             }
                         }
+                        // 게임방 삭제 메시지 방송
+                        broadcastRoomDeletion(base.id().toString());
                     }
                     break;
                 default:
@@ -543,14 +538,12 @@ public class LiarGameMain {
         return false;
     }
 
-    private void deleteRoomPanel(String roomID) {
-        RoomPanel panelToRemove = null;
-        for (RoomPanel panel : roomPanels) {
-            if (panel.gethost().equals(roomID)) {
-                panelToRemove = panel;
-                break;
-            }
-        }
+    private void deleteRoomPanel(String roomId) {
+        RoomPanel panelToRemove = roomPanels.stream()
+                .filter(panel -> panel.getRoomId().equals(roomId))
+                .findFirst()
+                .orElse(null);
+
         if (panelToRemove != null) {
             roomPanels.remove(panelToRemove);
             roomsPanel.remove(panelToRemove);
@@ -559,13 +552,6 @@ public class LiarGameMain {
         }
     }
 
-    public String getClientId() {
-        return client_id;
-    }
-
-    public String getTopic1() {
-        return topic1;
-    }
 
     public String getTopic2() {return topic2;}
 
@@ -624,6 +610,25 @@ public class LiarGameMain {
                 LOGGER.log(Level.SEVERE, "Failed to close MQTT client", e);
             }
         }
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public String getTopic1() {
+        return topic1;
+    }
+
+    public void setTopic1(String topic1) {
+        this.topic1 = topic1;
+    }
+
+    public void setHostFlag(int i) {
     }
 
     // Inner RoomPanel class
@@ -687,13 +692,16 @@ public class LiarGameMain {
     }
 
     private Data.C_Base fromJsonToC_Base(JsonObject baseJson) {
-        int m_Type = baseJson.get("type").getAsInt();
-        String m_sender = baseJson.get("sender").getAsString();
-        String m_receiver = baseJson.get("receiver").getAsString();
-        long m_time = baseJson.get("time").getAsLong();
-        String m_roomId = baseJson.get("roomId").getAsString();
+        int m_Type = baseJson.has("type") ? baseJson.get("type").getAsInt() : 0;
+        String m_sender = baseJson.has("sender") ? baseJson.get("sender").getAsString() : "";
+        String m_receiver = baseJson.has("receiver") ? baseJson.get("receiver").getAsString() : "";
+        long m_time = baseJson.has("time") ? baseJson.get("time").getAsLong() : 0;
+        String m_roomId = baseJson.has("roomId") ? baseJson.get("roomId").getAsString() : "";
+
         return new Data.C_Base(m_Type, m_sender, m_receiver, m_time, m_roomId);
     }
+
+
 
     private GData.G_Base fromJsonToG_Base(JsonObject baseJson) {
         String m_id = baseJson.get("id").getAsString();
@@ -706,10 +714,15 @@ public class LiarGameMain {
     public void setEnterRoom(String enter){
         this.enter_room = enter;
     }
-    public void setHostFlag(int flag){
-        this.host_flag = flag;
-    }
+
     public MqttClient getClient() {
         return client;
+    }
+    private void broadcastRoomDeletion(String roomId) {
+        // 모든 클라이언트에게 방 삭제 메시지 전송
+        Data.C_gameroomcancel cancelMessage = new Data.C_gameroomcancel(new Data.C_Base(Constant.C_GAMEROOMCANCEL, client_id, "all", System.currentTimeMillis(), roomId));
+        Gson gson = new Gson();
+        String message = gson.toJson(cancelMessage);
+        send(topic1, message); // 모든 클라이언트가 이 topic을 구독하고 있어야 합니다.
     }
 }
