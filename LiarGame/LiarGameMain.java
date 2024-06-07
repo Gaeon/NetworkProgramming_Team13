@@ -231,7 +231,9 @@ public class LiarGameMain {
                         System.out.println("삭제2");
                     }
                     System.out.println("삭제3");
-                    deleteRoomPanel(base.receiver());
+//                    deleteRoomPanel(base.receiver());
+                    // 방 삭제 메시지를 받으면 로컬에서 방 목록을 갱신
+                    deleteRoomPanel(base.roomId());
                     break;
                 case Constant.C_GAMEROOMEXIT:
                     if (base.receiver().equals(client_id)) {
@@ -343,21 +345,16 @@ public class LiarGameMain {
                         }
                         if (sender.equals("host")) {
                             String liar = msg.get("liar").getAsString();
+                            String keyword = null;
                             if (liar.equals(client_id)) {
                                 isLiar = true;
-                                for (GameWindow window : activeGameWindows) {
-                                    if (window.getRoomId().equals(base.id())) {
-                                        window.updateRoleAndKeyword(true, null);
-                                        break;
-                                    }
-                                }
                             } else {
-                                String keyword = msg.get("keyword").getAsString();
-                                for (GameWindow window : activeGameWindows) {
-                                    if (window.getRoomId().equals(base.id())) {
-                                        window.updateRoleAndKeyword(false, keyword);
-                                        break;
-                                    }
+                                keyword = msg.get("keyword").getAsString();
+                            }
+                            for (GameWindow window : activeGameWindows) {
+                                if (window.getRoomId().equals(base.id())) {
+                                    window.updateRoleAndKeyword(isLiar, keyword);
+                                    break;
                                 }
                             }
                         }
@@ -407,8 +404,6 @@ public class LiarGameMain {
                                     }
                                 }
                             } else if (!base.sender().equals(client_id)) {
-                                // 다른 사람의 키워드에 대한 설명을 받은 경우
-                                // 채팅창에 띄워줌
                                 for (GameWindow window : activeGameWindows) {
                                     if (window.getRoomId().equals(base.id())) {
                                         window.receiveOpinionMessage(base.sender(), msg.get("message").toString());
@@ -429,7 +424,7 @@ public class LiarGameMain {
                             for (GameWindow window : activeGameWindows) {
                                 if (window.getRoomId().equals(base.id())) {
                                     window.startChat();
-                                    window.receiveChatMessage("HOST", "!!!180초동안 자유롭게 토론을 진행해주세요!!");
+                                    window.receiveChatMessage("HOST", "180초동안 자유롭게 토론을 진행해주세요");
                                     window.activateChatField();
                                     break;
                                 }
@@ -488,20 +483,8 @@ public class LiarGameMain {
                                 break;
                             }
                         }
-                        // 게임방 삭제
-//                        String roomId = base.id().toString();
-//                        deleteRoomPanel(roomId);
-//                        if (host_flag == 1) {
-//                            Data.C_gameroomcancel roomcancle = new Data.C_gameroomcancel(new Data.C_Base(Constant.C_GAMEROOMCANCEL, liarGameMain.getClientId(), "host", System.currentTimeMillis(), roomId));
-//                            message = gson.toJson(roomcancle);
-//                            liarGameMain.send(liarGameMain.getTopic1(),message);
-//                        } else {
-//                            Data.C_gameroomexit gameroomexit = new Data.C_gameroomexit(new Data.C_Base(Constant.C_GAMEROOMEXIT, liarGameMain.getClientId(), "host", System.currentTimeMillis(), roomId));
-//                            message = gson.toJson(gameroomexit);
-//                        }
-//                        liarGameMain.send(liarGameMain.getTopic1(),message);
-//                        setEnterRoom(null);
-//                        setHostFlag(0);
+                        // 게임방 삭제 메시지 방송
+                        broadcastRoomDeletion(base.id().toString());
                     }
                     break;
                 default:
@@ -714,4 +697,10 @@ public class LiarGameMain {
     public MqttClient getClient() {
         return client;
     }
-}
+    private void broadcastRoomDeletion(String roomId) {
+        // 모든 클라이언트에게 방 삭제 메시지 전송
+        Data.C_gameroomcancel cancelMessage = new Data.C_gameroomcancel(new Data.C_Base(Constant.C_GAMEROOMCANCEL, client_id, "all", System.currentTimeMillis(), roomId));
+        Gson gson = new Gson();
+        String message = gson.toJson(cancelMessage);
+        send(topic1, message); // 모든 클라이언트가 이 topic을 구독하고 있어야 합니다.
+    }}
