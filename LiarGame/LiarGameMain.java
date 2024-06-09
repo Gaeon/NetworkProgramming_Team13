@@ -31,6 +31,7 @@ public class LiarGameMain {
     private List<RoomPanel> roomPanels = new ArrayList<>();
     private JPanel roomsPanel;
     private JFrame gameFrame;
+
     private static final Logger LOGGER = Logger.getLogger(LiarGameMain.class.getName());
     private GameRoom gameroom;
     private String enter_room = null;
@@ -72,7 +73,7 @@ public class LiarGameMain {
         submitButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                client_id = idField.getText();
+                client_id = idField.getText()+System.currentTimeMillis();
                 if (!client_id.isEmpty()) {
                     try {
                         client = new MqttClient(broker, client_id, new MemoryPersistence());
